@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dev-dist/
+coverage/
+
+# Generated / cached
+*.tsbuildinfo
+vite.config.ts.timestamp-*
+
+# Environment variables
+# Vite inlines every VITE_* value into the client bundle, so nothing secret
+# belongs here -- but deny all .env variants anyway and allow back only the
+# committed template.
+.env*
+!.env.example
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,333 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Design tokens
+   Neutral-first palette with a single teal accent, tuned for dense product UI.
+   Every surface, border and state colour is derived from these variables so a
+   component never hardcodes a colour.
+--------------------------------------------------------------------------- */
+@layer base {
+  :root {
+    color-scheme: light;
+
+    --background: 220 24% 98%;
+    --foreground: 222 28% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 28% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 28% 12%;
+
+    --primary: 167 74% 29%;
+    --primary-foreground: 0 0% 100%;
+    --primary-soft: 167 52% 95%;
+
+    --secondary: 220 16% 94%;
+    --secondary-foreground: 222 24% 20%;
+
+    --muted: 220 18% 95%;
+    --muted-foreground: 220 10% 44%;
+
+    --accent: 220 18% 95%;
+    --accent-foreground: 222 24% 18%;
+
+    --destructive: 0 72% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --destructive-soft: 0 80% 96%;
+
+    --success: 158 68% 32%;
+    --success-foreground: 0 0% 100%;
+    --success-soft: 158 60% 94%;
+
+    --warning: 32 88% 42%;
+    --warning-foreground: 0 0% 100%;
+    --warning-soft: 38 92% 94%;
+
+    --info: 214 82% 48%;
+    --info-foreground: 0 0% 100%;
+    --info-soft: 214 90% 96%;
+
+    --border: 220 16% 90%;
+    --input: 220 16% 86%;
+    --ring: 167 74% 34%;
+
+    --radius: 0.625rem;
+
+    /* Elevation. Kept very soft: depth comes from layering, not drop shadows. */
+    --shadow-xs: 0 1px 2px 0 hsl(222 28% 12% / 0.04);
+    --shadow-sm: 0 1px 2px 0 hsl(222 28% 12% / 0.05), 0 1px 3px 0 hsl(222 28% 12% / 0.05);
+    --shadow-md: 0 2px 4px -1px hsl(222 28% 12% / 0.06), 0 4px 12px -2px hsl(222 28% 12% / 0.08);
+    --shadow-lg: 0 4px 8px -2px hsl(222 28% 12% / 0.08), 0 12px 28px -6px hsl(222 28% 12% / 0.12);
+    --shadow-xl: 0 8px 16px -4px hsl(222 28% 12% / 0.1), 0 24px 48px -12px hsl(222 28% 12% / 0.18);
+
+    --sidebar: 220 22% 97%;
+    --sidebar-foreground: 222 20% 28%;
+    --sidebar-primary: 167 74% 29%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 18% 93%;
+    --sidebar-accent-foreground: 222 24% 16%;
+    --sidebar-border: 220 16% 90%;
+    --sidebar-ring: 167 74% 34%;
+
+    /* -----------------------------------------------------------------------
+       Brand palette -- public surfaces only.
+       Deliberately separate from --primary: the product UI keeps its teal, so
+       changing the marketing look here can never shift a button inside the app.
+       Indigo leads, violet supports, blue carries links and quieter accents.
+    ----------------------------------------------------------------------- */
+    --brand: 243 75% 59%;
+    --brand-foreground: 0 0% 100%;
+    --brand-strong: 245 58% 47%;
+    --brand-soft: 240 100% 97%;
+    --brand-muted: 240 60% 93%;
+    --brand-accent: 268 74% 60%;
+    --brand-sky: 214 95% 58%;
+    --brand-ink: 240 36% 14%;
+  }
+
+  .dark {
+    color-scheme: dark;
+
+    --background: 224 24% 7%;
+    --foreground: 215 22% 95%;
+
+    --card: 224 20% 10%;
+    --card-foreground: 215 22% 95%;
+    --popover: 224 20% 12%;
+    --popover-foreground: 215 22% 95%;
+
+    --primary: 164 62% 46%;
+    --primary-foreground: 224 32% 8%;
+    --primary-soft: 166 46% 15%;
+
+    --secondary: 223 16% 17%;
+    --secondary-foreground: 215 20% 92%;
+
+    --muted: 223 16% 16%;
+    --muted-foreground: 218 12% 64%;
+
+    --accent: 223 16% 18%;
+    --accent-foreground: 215 22% 94%;
+
+    --destructive: 0 72% 56%;
+    --destructive-foreground: 0 0% 100%;
+    --destructive-soft: 0 54% 17%;
+
+    --success: 158 60% 46%;
+    --success-foreground: 224 32% 8%;
+    --success-soft: 158 46% 14%;
+
+    --warning: 36 90% 56%;
+    --warning-foreground: 224 32% 8%;
+    --warning-soft: 36 56% 15%;
+
+    --info: 212 90% 62%;
+    --info-foreground: 224 32% 8%;
+    --info-soft: 212 60% 16%;
+
+    --border: 222 14% 19%;
+    --input: 222 14% 24%;
+    --ring: 164 62% 46%;
+
+    --shadow-xs: 0 1px 2px 0 hsl(0 0% 0% / 0.3);
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.35), 0 1px 3px 0 hsl(0 0% 0% / 0.3);
+    --shadow-md: 0 2px 4px -1px hsl(0 0% 0% / 0.4), 0 4px 12px -2px hsl(0 0% 0% / 0.4);
+    --shadow-lg: 0 4px 8px -2px hsl(0 0% 0% / 0.45), 0 12px 28px -6px hsl(0 0% 0% / 0.5);
+    --shadow-xl: 0 8px 16px -4px hsl(0 0% 0% / 0.5), 0 24px 48px -12px hsl(0 0% 0% / 0.6);
+
+    --sidebar: 224 24% 9%;
+    --sidebar-foreground: 215 16% 76%;
+    --sidebar-primary: 164 62% 46%;
+    --sidebar-primary-foreground: 224 32% 8%;
+    --sidebar-accent: 223 16% 16%;
+    --sidebar-accent-foreground: 215 22% 95%;
+    --sidebar-border: 222 14% 16%;
+
+    /* Brand, dark. Lifted and slightly desaturated so it reads on near-black. */
+    --brand: 243 85% 72%;
+    --brand-foreground: 243 60% 12%;
+    --brand-strong: 243 80% 66%;
+    --brand-soft: 243 40% 15%;
+    --brand-muted: 243 32% 22%;
+    --brand-accent: 268 80% 74%;
+    --brand-sky: 212 95% 70%;
+    --brand-ink: 240 30% 92%;
+    --sidebar-ring: 164 62% 46%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: 'cv02' 1, 'cv03' 1, 'cv04' 1, 'calt' 1;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-display tracking-tight;
+    font-weight: 600;
+  }
+
+  h1 {
+    letter-spacing: -0.022em;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  input,
+  select,
+  textarea {
+    color: hsl(var(--foreground));
+  }
+
+  input[type='checkbox'],
+  input[type='radio'] {
+    accent-color: hsl(var(--primary));
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: hsl(var(--muted-foreground));
+    opacity: 0.75;
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    color: hsl(var(--primary-foreground));
+    background: hsl(var(--primary));
+  }
+
+  /* Numeric columns line up in tables, metrics and diff counts. */
+  .tabular,
+  th[data-numeric],
+  td[data-numeric] {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* Unobtrusive scrollbars that match the surface they sit on. */
+  .scrollbar-slim {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.5);
+    background-clip: content-box;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Kept for the project tab strip, which predates .scrollbar-none. */
+  .project-tabs-scroll {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .project-tabs-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .animate-in {
+    animation: fadeIn 0.18s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Staggered entrance for page sections. */
+  .animate-rise {
+    animation: rise 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+
+  /* Shared form-control surface so native inputs match the Input component. */
+  main :is(input:not([type='checkbox']):not([type='radio']), select, textarea) {
+    @apply rounded-md border-input bg-background transition-colors focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/25 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

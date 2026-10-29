@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dev-dist/
+coverage/
+
+# Generated and cached files
+*.tsbuildinfo
+vite.config.ts.timestamp-*
+
+# Environment files
+.env*
+!.env.example
+
+# OS / IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

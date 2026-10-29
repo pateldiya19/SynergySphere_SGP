@@ -1,0 +1,94 @@
+{
+  "root": true,
+  "parser": "@typescript-eslint/parser",
+  "plugins": [
+    "@typescript-eslint",
+    "security"
+  ],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:security/recommended",
+    "eslint-config-prettier"
+  ],
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module",
+    "project": "./tsconfig.json"
+  },
+  "env": {
+    "node": true,
+    "es2022": true,
+    "jest": true
+  },
+  "rules": {
+    // TypeScript specific rules
+    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "@typescript-eslint/explicit-function-return-type": "warn",
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/no-non-null-assertion": "warn",
+    "@typescript-eslint/prefer-nullish-coalescing": "warn",
+    "@typescript-eslint/prefer-optional-chain": "warn",
+
+    // General JavaScript rules
+    "no-console": "warn",
+    "no-debugger": "error",
+    "no-alert": "error",
+    "no-unused-expressions": "error",
+    "no-duplicate-imports": "error",
+    "prefer-const": "error",
+    "no-var": "error",
+
+    // Security rules
+    "security/detect-object-injection": "warn",
+    "security/detect-non-literal-regexp": "error",
+    "security/detect-unsafe-regex": "error",
+    "security/detect-buffer-noassert": "error",
+    "security/detect-child-process": "warn",
+    "security/detect-disable-mustache-escape": "error",
+    "security/detect-eval-with-expression": "error",
+    "security/detect-no-csrf-before-method-override": "error",
+    "security/detect-non-literal-fs-filename": "warn",
+    "security/detect-non-literal-require": "warn",
+    "security/detect-possible-timing-attacks": "warn",
+    "security/detect-pseudoRandomBytes": "error",
+
+    // Code quality rules
+    "complexity": ["warn", 15],
+    "max-depth": ["warn", 5],
+    "max-lines": ["warn", 900],
+    "max-lines-per-function": ["warn", 160],
+    "max-params": ["warn", 6],
+
+    // Import/export rules
+    "sort-imports": ["error", {
+      "ignoreCase": true,
+      "ignoreDeclarationSort": true
+    }]
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.spec.ts"],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "off",
+        "security/detect-object-injection": "off",
+        "max-lines": "off",
+        "max-lines-per-function": "off"
+      }
+    },
+    {
+      "files": ["src/scripts/**/*.ts"],
+      "rules": {
+        "no-console": "off",
+        "max-lines": "off",
+        "max-lines-per-function": "off"
+      }
+    }
+  ],
+  "ignorePatterns": [
+    "dist/",
+    "node_modules/",
+    "coverage/",
+    "*.js"
+  ]
+}
