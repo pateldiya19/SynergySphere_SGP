@@ -184,6 +184,15 @@ All routes below are under `/api`. “Auth” means a bearer access token is
 required. Query parameters are validated where noted; request and response
 bodies use JSON unless an attachment upload is explicitly multipart.
 
+### Docker Compose
+
+Run `docker compose up --build` from this directory after setting strong,
+different values for `MONGO_ROOT_PASSWORD`, `MONGO_APP_PASSWORD`, `JWT_SECRET`,
+and `JWT_REFRESH_SECRET` in `.env`. MongoDB data is stored in the named
+`mongodb_data` volume; do not remove it unless the database data is intended
+to be destroyed. The backend is available at `http://localhost:5000` and the
+frontend at `http://localhost:3000`.
+
 ### Health and authentication
 
 | Method and path | Auth | Purpose |

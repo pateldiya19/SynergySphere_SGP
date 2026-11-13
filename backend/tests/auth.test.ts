@@ -124,6 +124,42 @@ describe('Auth Controller', () => {
     });
   });
 
+  describe('POST /api/auth/refresh-token', () => {
+    it('should issue a new access token for a valid refresh token', async () => {
+      const registerResponse = await request(app).post('/api/auth/register').send({
+        name: 'Refresh User',
+        email: 'refresh@example.com',
+        password: 'password123',
+      });
+
+      const refreshToken = registerResponse.body.data.refreshToken;
+      const response = await request(app)
+        .post('/api/auth/refresh-token')
+        .send({ refreshToken })
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.accessToken).toBeDefined();
+    });
+
+    it('should reject a missing refresh token', async () => {
+      const response = await request(app).post('/api/auth/refresh-token').send({}).expect(401);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('Refresh token is required');
+    });
+
+    it('should reject an invalid refresh token', async () => {
+      const response = await request(app)
+        .post('/api/auth/refresh-token')
+        .send({ refreshToken: 'invalid-token' })
+        .expect(401);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toContain('Invalid refresh token');
+    });
+  });
+
   describe('GET /api/auth/profile', () => {
     let accessToken: string;
 
