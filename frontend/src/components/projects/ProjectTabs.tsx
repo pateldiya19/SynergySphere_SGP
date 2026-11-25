@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   ListChecks,
   MessageSquare,
+  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -20,6 +21,7 @@ type ProjectTab =
   | 'discussion'
   | 'activity'
   | 'analytics'
+  | 'autopilot'
 
 const tabs: {
   key: ProjectTab
@@ -50,6 +52,7 @@ const tabs: {
     icon: BarChart3,
     path: id => `/projects/${id}/analytics`,
   },
+  { key: 'autopilot', label: 'Autopilot', icon: Sparkles, path: id => `/projects/${id}/autopilot` },
 ]
 
 export function ProjectTabs({ projectId, active }: { projectId: string; active: ProjectTab }) {

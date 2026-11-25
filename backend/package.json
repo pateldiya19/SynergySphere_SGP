@@ -38,6 +38,10 @@
   "author": "NMIT Team",
   "license": "MIT",
   "dependencies": {
+    "@langchain/core": "^1.4.0",
+    "@langchain/google-genai": "^2.3.6",
+    "@langchain/langgraph": "^1.7.4",
+    "@langchain/openai": "^1.8.4",
     "bcryptjs": "^2.4.3",
     "cloudinary": "^1.41.0",
     "compression": "^1.7.4",

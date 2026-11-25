@@ -18,6 +18,7 @@ import { ActivityPage } from '@/pages/projects/ActivityPage'
 import { AnalyticsPage } from '@/pages/projects/AnalyticsPage'
 import { HealthPage } from '@/pages/projects/HealthPage'
 import { TimelinePage } from '@/pages/projects/TimelinePage'
+import { AutopilotPage } from '@/pages/projects/AutopilotPage'
 import { ThemeProvider } from '@/components/theme-provider'
 
 function App() {
@@ -59,6 +60,7 @@ function App() {
           <Route path="/projects/:id/health" element={<HealthPage />} />
           <Route path="/projects/:id/activity" element={<ActivityPage />} />
           <Route path="/projects/:id/analytics" element={<AnalyticsPage />} />
+          <Route path="/projects/:id/autopilot" element={<AutopilotPage />} />
           <Route path="/tasks/:id" element={<TaskDetailPage />} />
           <Route path="/projects/:id/discussions" element={<ProjectDiscussionPage />} />
           <Route path="/my-tasks" element={<MyTasksPage />} />

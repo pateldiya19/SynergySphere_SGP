@@ -1,5 +1,6 @@
 import { TaskReminderService } from '@/services/TaskReminderService';
 import { logger } from '@/utils';
+import { AutopilotService } from '@/services/AutopilotService';
 
 /** How often the reminder sweep runs once the server is up. */
 const SWEEP_INTERVAL_MS = 15 * 60 * 1000;
@@ -13,6 +14,7 @@ let initialTimer: NodeJS.Timeout | null = null;
 async function runSweepSafely(): Promise<void> {
   try {
     await TaskReminderService.runSweep();
+    await AutopilotService.monitorProjects();
   } catch (error: any) {
     // A failed sweep must never take the server down: the tasks it did not
     // claim stay unclaimed and the next run picks them up.

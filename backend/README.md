@@ -39,6 +39,7 @@ The frontend that consumes this API is documented in
 | Morgan and Winston | HTTP and application logging |
 | Multer and Cloudinary | Multipart task uploads and optional attachment storage |
 | Nodemailer | Optional invitation and proof-review email delivery |
+| LangGraph and LangChain provider adapters | Modular Autopilot reasoning workflow with configurable OpenAI or Gemini models |
 | Jest, Supertest, mongodb-memory-server | Tests and HTTP/database test isolation |
 | `tsx`, `tsc-alias`, ESLint, Prettier | Development execution, build aliases, linting, and formatting |
 
@@ -102,6 +103,9 @@ values and defaults are derived from `src/config/index.ts` and
 | `GITHUB_OAUTH_CALLBACK_URL` | No | Must exactly match the GitHub OAuth app callback; default uses the configured port |
 | `GITHUB_WEBHOOK_SECRET` | No | Strong HMAC secret enabling signed GitHub evidence ingestion |
 | `GITHUB_WEBHOOK_URL` | No | URL shown by webhook configuration; default is `/api/github/webhook` on the configured port |
+| `AI_PROVIDER` | No | `openai` or `gemini`; unset keeps deterministic Autopilot checks active |
+| `OPENAI_API_KEY`, `OPENAI_MODEL` | No | Backend-only OpenAI credentials and model; used when `AI_PROVIDER=openai` |
+| `GEMINI_API_KEY`, `GEMINI_MODEL` | No | Backend-only Gemini credentials and model; used when `AI_PROVIDER=gemini` |
 
 Generate each signing/webhook secret separately, for example:
 
@@ -111,7 +115,12 @@ node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 
 Startup rejects missing required values, short or template secrets, equal JWT
 secrets, and MongoDB URIs that do not name a database. GitHub OAuth is
-disabled when both OAuth values are absent; email and Cloudinary are optional.
+disabled when both OAuth values are absent; email, Cloudinary, and Autopilot AI
+are optional. Autopilot never exposes provider keys to the frontend. When a
+provider is configured, its LangGraph workflow retrieves the project context,
+collects verified facts, reasons over the context, and validates recommendations
+against known task/member IDs before persisting them. Provider failures fall
+back to deterministic health checks without bypassing manager approval.
 
 ## Application architecture
 
@@ -374,11 +383,85 @@ process; SIGINT/SIGTERM exit cleanly.
 | `npm run clean` | Remove `dist` |
 
 Tests use the configured test MongoDB URI and the repository's Jest setup;
-`mongodb-memory-server` is available for isolated database tests. For
-deployment, run `npm run build` in a CI/build environment, provide production
-environment variables through the deployment platform, and run `npm start`.
-The application itself does not provide a process manager, container image, or
-external job queue.
+`mongodb-memory-server` is available for isolated database tests.
+
+### CI/CD deployment to AWS EC2
+
+The repository's [GitHub Actions workflow](../.github/workflows/ci-cd.yml)
+runs backend and frontend install, lint, type-check, test, and production
+build checks. A push to `main` deploys the existing Docker Compose stack to
+EC2 only after both check jobs pass. Pull requests run the checks but never
+deploy.
+
+The deployment uses the existing `backend/docker-compose.yml` stack:
+MongoDB, the backend on port `5000`, and the Nginx frontend on port `3000`.
+It does not use PM2. Each deployment is checked out into a commit-named
+release directory. The `current` symlink is promoted only after the containers
+start and both backend and frontend health checks pass. A remote `flock`
+prevents overlapping deployments.
+
+#### One-time EC2 setup
+
+1. Install Git, Docker Engine, the Docker Compose plugin, and OpenSSH on the
+   Linux EC2 host. Add the deployment user to the `docker` group and log in
+   again so `docker compose` works without `sudo`.
+2. Create the deployment directories and environment file:
+
+   ```bash
+   sudo mkdir -p /srv/synergysphere/shared /srv/synergysphere/releases
+   sudo chown -R "$USER":"$USER" /srv/synergysphere
+   cp backend/.env.example /srv/synergysphere/shared/backend.env
+   chmod 600 /srv/synergysphere/shared/backend.env
+   ```
+
+   Replace every required placeholder in `backend.env`. Keep this file on
+   the server; the workflow never creates, copies, or overwrites it.
+3. Configure a read-only GitHub deploy key for the EC2 deployment user so
+   `git@github.com:<owner>/<repository>.git` can be cloned from the host.
+   Verify `git ls-remote git@github.com:pateldiya19/SynergySphere_SGP.git`
+   as that user. Do not put this private key in the repository.
+4. Ensure the EC2 security group or reverse proxy permits the intended public
+   frontend port. The backend health check is internal to the Compose network.
+
+#### Required GitHub Actions secrets
+
+Configure these repository or production-environment secrets:
+
+| Secret | Purpose |
+| --- | --- |
+| `EC2_HOST` | EC2 DNS name or IP address |
+| `EC2_USER` | SSH deployment username |
+| `EC2_SSH_KEY` | Private key used by the runner to SSH to EC2 |
+| `EC2_APP_DIR` | Absolute deployment directory, for example `/srv/synergysphere` |
+
+`EC2_APP_DIR` is intentionally explicit because the repository cannot safely
+infer the server's filesystem layout. The GitHub deploy key mentioned above is
+an EC2 host prerequisite, not a workflow secret. Never print any of these
+values in workflow logs.
+
+#### Triggering, monitoring, and rollback
+
+Merge or push to `main` to trigger the workflow. Review the `Backend checks`
+and `Frontend checks` jobs before the `Deploy to EC2` job. The deploy job
+reports the checked-out commit, Compose build/start progress, and health-check
+failure without printing environment values.
+
+If a deployed release must be reverted, SSH to EC2 and promote the previous
+release, then start its Compose files:
+
+```bash
+cd /srv/synergysphere
+PREVIOUS="$(find releases -mindepth 1 -maxdepth 1 -type d | sort | tail -n 2 | head -n 1)"
+ln -sfn "$PREVIOUS" current
+docker compose --project-name synergysphere \
+  --env-file "$PREVIOUS/backend/.env" \
+  -f "$PREVIOUS/backend/docker-compose.yml" up -d --remove-orphans
+```
+
+Replace `/srv/synergysphere` with the configured `EC2_APP_DIR`. The workflow
+automatically attempts this same previous-release recovery when a promoted
+release fails its health check. Retain release directories until the desired
+rollback window has passed; cleanup is intentionally not automated.
 
 ## Troubleshooting
 

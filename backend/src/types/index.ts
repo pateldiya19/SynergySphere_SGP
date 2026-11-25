@@ -224,7 +224,8 @@ export type NotificationType =
   | 'project_invite_declined'
   | 'project_invite_cancelled'
   | 'project_member_added'
-  | 'project_member_removed';
+  | 'project_member_removed'
+  | 'autopilot_risk';
 
 export interface Notification {
   _id: ID;

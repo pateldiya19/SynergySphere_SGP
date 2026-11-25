@@ -9,3 +9,4 @@ export { TaskComment, TaskCommentDocument } from './TaskComment';
 export { GitHubWebhookDelivery } from './GitHubWebhookDelivery';
 export { GitHubOAuthState, GitHubOAuthStateDocument } from './GitHubOAuthState';
 export { ProjectInvitation, ProjectInvitationDocument } from './ProjectInvitation';
+export { AutopilotRecord, AutopilotRecordDocument } from './AutopilotRecord';

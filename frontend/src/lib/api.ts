@@ -276,6 +276,152 @@ export function getProjectHealth(projectId: string): Promise<ApiProjectHealth> {
   return apiRequest<ApiProjectHealth>(`/api/projects/${projectId}/health`)
 }
 
+export type ApiAutopilotRecord = {
+  id: string
+  projectId: string
+  type: 'risk' | 'recommendation' | 'chat'
+  status: 'observed' | 'pending' | 'approved' | 'rejected' | 'executed' | 'failed' | 'resolved'
+  title: string
+  summary: string
+  severity?: 'low' | 'medium' | 'high' | 'critical'
+  source?: 'deterministic' | 'ai'
+  reasoning?: string
+  verifiedFacts?: string[]
+  estimates?: string[]
+  evidence: Array<{ label: string; value: string }>
+  action?: {
+    type: 'assign_task' | 'reschedule_task' | 'update_priority'
+    taskId: string
+    assigneeId?: string | ApiUser
+    dueDate?: string
+    priority?: ApiTask['priority']
+  }
+  question?: string
+  answer?: string
+  result?: string
+  createdAt: string
+}
+
+export type ApiAutopilot = {
+  context: {
+    project: ApiProject
+    tasks: ApiTask[]
+    health: ApiProjectHealth
+    progress: number
+    activity: { events: number; discussions: number; lastActivityAt: string | null }
+    comments: Array<{ taskId: string; body: string; authorName: string; createdAt: string }>
+    github: {
+      connected: boolean
+      commits: number
+      pullRequests: number
+      mergedPullRequests: number
+    }
+  }
+  risks: ApiProjectHealthRisk[]
+  recommendations: ApiAutopilotRecord[]
+  records: ApiAutopilotRecord[]
+  ai: {
+    available: boolean
+    provider: 'openai' | 'gemini' | null
+    model: string | null
+    summary: string
+    reasoning: string
+    verifiedFacts: string[]
+    estimates: string[]
+    error?: string
+  }
+}
+
+export function getAutopilot(projectId: string): Promise<ApiAutopilot> {
+  return apiRequest<ApiAutopilot>(`/api/autopilot/${projectId}`)
+}
+
+export function askAutopilot(
+  projectId: string,
+  question: string
+): Promise<{
+  answer: string
+  evidence: Array<{ label: string; value: string }>
+  ai: {
+    available: boolean
+    provider: 'openai' | 'gemini' | null
+    model: string | null
+    error?: string
+  }
+}> {
+  return apiRequest(`/api/autopilot/${projectId}/assistant`, {
+    method: 'POST',
+    body: JSON.stringify({ question }),
+  })
+}
+
+export async function streamAutopilot(
+  projectId: string,
+  question: string,
+  onToken: (token: string) => void
+): Promise<{
+  evidence: Array<{ label: string; value: string }>
+  ai: { configured: boolean; provider: 'openai' | 'gemini' | null; model: string | null }
+}> {
+  const request = (token: string | null) =>
+    fetch(`/api/autopilot/${projectId}/assistant/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ question }),
+    })
+  let response = await request(localStorage.getItem('auth_token'))
+  if (response.status === 401) {
+    const token = await refreshAccessToken()
+    if (token) response = await request(token)
+  }
+  if (!response.ok || !response.body) {
+    const payload = await response.json().catch(() => null)
+    throw new Error(payload?.error || payload?.message || 'Streaming assistant request failed')
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let complete: {
+    evidence: Array<{ label: string; value: string }>
+    ai: { configured: boolean; provider: 'openai' | 'gemini' | null; model: string | null }
+  } | null = null
+  let streamComplete = false
+  while (!streamComplete) {
+    const chunk = await reader.read()
+    streamComplete = chunk.done
+    if (streamComplete) break
+    buffer += decoder.decode(chunk.value, { stream: true })
+    const events = buffer.split('\n\n')
+    buffer = events.pop() || ''
+    for (const event of events) {
+      const dataLine = event.split('\n').find(line => line.startsWith('data: '))
+      if (!dataLine) continue
+      const payload = JSON.parse(dataLine.slice(6))
+      if (event.startsWith('event: token')) onToken(String(payload.token || ''))
+      if (event.startsWith('event: complete')) complete = payload
+      if (event.startsWith('event: error')) throw new Error(payload.error || 'AI response failed')
+    }
+  }
+  if (!complete) throw new Error('Assistant stream ended before completion')
+  return complete
+}
+
+export function approveAutopilotAction(actionId: string): Promise<ApiAutopilotRecord> {
+  return apiRequest<ApiAutopilotRecord>(`/api/autopilot/actions/${actionId}/approve`, {
+    method: 'POST',
+  })
+}
+
+export function rejectAutopilotAction(actionId: string): Promise<ApiAutopilotRecord> {
+  return apiRequest<ApiAutopilotRecord>(`/api/autopilot/actions/${actionId}/reject`, {
+    method: 'POST',
+  })
+}
+
 export type ApiTaskStatus =
   | 'todo'
   | 'in_progress'

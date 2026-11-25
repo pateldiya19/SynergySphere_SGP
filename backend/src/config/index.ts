@@ -119,6 +119,11 @@ const githubOAuthValues = [
   process.env.GITHUB_OAUTH_CLIENT_ID,
   process.env.GITHUB_OAUTH_CLIENT_SECRET,
 ];
+const AI_PROVIDER = (process.env.AI_PROVIDER || '').toLowerCase();
+
+if (AI_PROVIDER && !['openai', 'gemini'].includes(AI_PROVIDER)) {
+  throw new Error('AI_PROVIDER must be either "openai" or "gemini" when configured');
+}
 
 if (githubOAuthValues.some(Boolean)) {
   if (!githubOAuthValues.every(Boolean)) {
@@ -127,6 +132,7 @@ if (githubOAuthValues.some(Boolean)) {
         'left unset to disable GitHub identity linking. Only one is currently set.'
     );
   }
+
   assertStrongSecret('GITHUB_OAUTH_CLIENT_SECRET', process.env.GITHUB_OAUTH_CLIENT_SECRET!);
 }
 
@@ -165,6 +171,11 @@ export const config = {
   GITHUB_OAUTH_CALLBACK_URL:
     process.env.GITHUB_OAUTH_CALLBACK_URL ||
     `http://localhost:${process.env.PORT || 5000}/api/auth/github/callback`,
+  AI_PROVIDER: AI_PROVIDER as '' | 'openai' | 'gemini',
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+  OPENAI_MODEL: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
+  GEMINI_MODEL: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
 };
 
 /** Whether GitHub identity linking is configured and therefore available. */

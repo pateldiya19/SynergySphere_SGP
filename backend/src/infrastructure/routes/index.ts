@@ -9,6 +9,7 @@ import notificationRoutes from './notifications';
 import searchRoutes from './search';
 import projectActivityRoutes from './projectActivity';
 import invitationRoutes from './invitations';
+import autopilotRoutes from './autopilot';
 import { DashboardController } from '@/controllers/DashboardController';
 import { authenticate } from '@/middleware';
 
@@ -24,6 +25,7 @@ router.use('/tasks', taskRoutes);
 router.use('/discussions', discussionRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/invitations', invitationRoutes);
+router.use('/autopilot', autopilotRoutes);
 router.use('/search', searchRoutes);
 router.use('/projects', projectActivityRoutes);
 router.get('/dashboard', authenticate, DashboardController.getDashboard);
