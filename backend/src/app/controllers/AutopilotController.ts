@@ -2,7 +2,7 @@ import { body, param } from 'express-validator';
 import { Response } from 'express';
 import { AutopilotRecord, Project } from '@/models';
 import { AuthenticatedRequest } from '@/middleware';
-import { ResponseUtils } from '@/utils';
+import { logger, ResponseUtils } from '@/utils';
 import { AutopilotService } from '@/services/AutopilotService';
 
 export class AutopilotController {
@@ -37,13 +37,22 @@ export class AutopilotController {
       : null;
   }
 
+  /**
+   * Load the board: deterministic risks and recommendations only.
+   *
+   * No AI call. Opening a project used to spend provider quota on every page
+   * load and every refresh, which is both expensive and surprising -- nobody
+   * asked for an analysis by navigating. The response still reports whether a
+   * provider is configured so the UI can offer to run one, and the rule-based
+   * risk detection works identically with no API key at all.
+   */
   static async get(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      if (!(await this.access(req))) {
+      if (!(await AutopilotController.access(req))) {
         ResponseUtils.notFound(res, 'Project not found or access denied');
         return;
       }
-      const analysis = await AutopilotService.analyzeProject(req.params.id, { useAi: true });
+      const analysis = await AutopilotService.analyzeProject(req.params.id);
       const records = await AutopilotService.listRecords(req.params.id);
       ResponseUtils.success(
         res,
@@ -55,9 +64,49 @@ export class AutopilotController {
     }
   }
 
+  /**
+   * Run an AI analysis. This is the only path that calls the provider, and it
+   * only runs because the user pressed the button.
+   */
+  static async analyze(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      if (!(await AutopilotController.access(req))) {
+        ResponseUtils.notFound(res, 'Project not found or access denied');
+        return;
+      }
+
+      const analysis = await AutopilotService.analyzeProject(req.params.id, {
+        useAi: true,
+        actorId: String(req.user._id),
+      });
+      const records = await AutopilotService.listRecords(req.params.id);
+
+      // A provider that is configured but failed must not look like a success:
+      // report it as an error so the UI can say so rather than showing an empty
+      // summary as though the analysis had run.
+      if (!analysis.ai.available) {
+        ResponseUtils.error(
+          res,
+          analysis.ai.error ||
+            (analysis.ai.configured
+              ? 'The configured AI provider could not complete this analysis.'
+              : 'No AI provider is configured on this server.'),
+          analysis.ai.configured ? 502 : 503,
+          { ...analysis, records }
+        );
+        return;
+      }
+
+      ResponseUtils.success(res, { ...analysis, records }, 'Autopilot analysis completed');
+    } catch (error: any) {
+      logger.error(`Autopilot analysis failed for project ${req.params.id}: ${error.message}`);
+      ResponseUtils.serverError(res, 'Autopilot analysis failed. Please retry.');
+    }
+  }
+
   static async ask(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      if (!(await this.access(req))) {
+      if (!(await AutopilotController.access(req))) {
         ResponseUtils.notFound(res, 'Project not found or access denied');
         return;
       }
@@ -73,7 +122,7 @@ export class AutopilotController {
 
   static async stream(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      if (!(await this.access(req))) {
+      if (!(await AutopilotController.access(req))) {
         ResponseUtils.notFound(res, 'Project not found or access denied');
         return;
       }
@@ -98,11 +147,19 @@ export class AutopilotController {
       });
       res.end();
     } catch (error: any) {
+      logger.error(`Autopilot stream failed for project ${req.params.id}: ${error.message}`);
       if (!res.headersSent) {
         ResponseUtils.serverError(res, error.message);
         return;
       }
-      res.write(`event: error\ndata: ${JSON.stringify({ error: 'AI response failed' })}\n\n`);
+      res.write(
+        `event: error\ndata: ${JSON.stringify({
+          error:
+            error.message === 'The configured AI provider could not complete this request.'
+              ? error.message
+              : 'Autopilot response failed. Please retry.',
+        })}\n\n`
+      );
       res.end();
     }
   }
@@ -130,7 +187,7 @@ export class AutopilotController {
         ResponseUtils.notFound(res, 'Recommendation not found');
         return;
       }
-      if (!(await this.manageAccess(req, String(record.projectId)))) {
+      if (!(await AutopilotController.manageAccess(req, String(record.projectId)))) {
         ResponseUtils.forbidden(
           res,
           'Only project owners and managers can reject Autopilot actions'

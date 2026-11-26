@@ -259,6 +259,24 @@ export class TaskProofController {
         const reviewers = await User.find({ _id: { $in: [...recipients] } })
           .select('email')
           .lean<Array<{ email: string }>>();
+        // Give the manager the actual evidence in the mail, so they can judge
+        // it without first hunting for it in the app.
+        const evidence = ((task as any).proofOfWork || [])
+          .map((proof: any) => {
+            if (proof.type === 'github') {
+              const parts = [
+                proof.repository,
+                proof.pullRequestNumber ? `PR #${proof.pullRequestNumber}` : null,
+                proof.branch ? `branch ${proof.branch}` : null,
+                proof.commitCount ? `${proof.commitCount} commit(s)` : null,
+              ].filter(Boolean);
+              return { label: parts.join(' · ') || 'GitHub evidence', url: proof.url };
+            }
+            if (proof.type === 'demo_url') return { label: 'Demo', url: proof.url };
+            return null;
+          })
+          .filter(Boolean) as Array<{ label: string; url?: string }>;
+
         for (const reviewer of reviewers) {
           await EmailService.sendReviewRequest({
             to: reviewer.email,
@@ -267,6 +285,8 @@ export class TaskProofController {
             taskKey: (task as any).taskKey,
             projectName: project.name,
             taskId,
+            description: notes,
+            evidence,
           });
         }
       })();
@@ -375,6 +395,27 @@ export class TaskProofController {
               : `Changes requested for ${(task as any).title}: ${comment}`,
           payload: { projectId, taskId, taskKey: (task as any).taskKey, status: nextStatus },
         });
+
+        // Email the decision too, so the developer hears about it without
+        // having to be in the app. Fire-and-forget: EmailService already
+        // swallows and logs its own failures, and the review must not fail
+        // because a mail server is slow or unconfigured.
+        void (async () => {
+          const assignee = await User.findById(assigneeId)
+            .select('email')
+            .lean<{ email: string } | null>();
+          if (!assignee?.email) return;
+          await EmailService.sendProofReviewed({
+            to: assignee.email,
+            reviewerName: req.user.name,
+            decision,
+            taskTitle: (task as any).title,
+            taskKey: (task as any).taskKey,
+            projectName: project.name,
+            taskId,
+            comment,
+          });
+        })();
       }
 
       const result = await populatedTask(taskId);

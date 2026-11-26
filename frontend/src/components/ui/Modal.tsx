@@ -34,12 +34,17 @@ export function Modal({
   const titleId = React.useId()
   const descriptionId = React.useId()
   const panelRef = React.useRef<HTMLDivElement>(null)
+  const onCloseRef = React.useRef(onClose)
+
+  React.useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
 
   React.useEffect(() => {
     if (!isOpen) return
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') onCloseRef.current()
     }
 
     const previouslyFocused = document.activeElement as HTMLElement | null
@@ -48,9 +53,13 @@ export function Modal({
     document.body.style.overflow = 'hidden'
 
     // Move focus into the dialog so keyboard users land in the right place.
-    const focusTarget = panelRef.current?.querySelector<HTMLElement>(
-      'input:not([type="hidden"]), textarea, select, button, [href], [tabindex]:not([tabindex="-1"])'
-    )
+    const focusTarget =
+      panelRef.current?.querySelector<HTMLElement>(
+        'input:not([type="hidden"]), textarea, select'
+      ) ??
+      panelRef.current?.querySelector<HTMLElement>(
+        'button, [href], [tabindex]:not([tabindex="-1"])'
+      )
     focusTarget?.focus()
 
     return () => {
@@ -58,7 +67,7 @@ export function Modal({
       document.body.style.overflow = previousOverflow
       previouslyFocused?.focus?.()
     }
-  }, [isOpen, onClose])
+  }, [isOpen])
 
   if (!isOpen) return null
 

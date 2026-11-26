@@ -146,8 +146,8 @@ export const config = {
   JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET!,
   JWT_REFRESH_EXPIRE: process.env.JWT_REFRESH_EXPIRE || '30d',
   FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:5173',
-  // Email is optional: with SMTP unset the app runs normally and invitations
-  // and review requests stay in-app only.
+  // SMTP is required for email OTP registration; invitation and review emails
+  // remain optional when those settings are absent.
   SMTP_HOST: process.env.SMTP_HOST || '',
   SMTP_PORT: Number(process.env.SMTP_PORT || 587),
   SMTP_EMAIL: process.env.SMTP_EMAIL || '',

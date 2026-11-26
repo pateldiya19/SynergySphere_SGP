@@ -2,6 +2,7 @@ import request from 'supertest';
 import { Express } from 'express';
 import { createApp } from '../src/app';
 import { Project, Task, User } from '../src/app/models';
+import { createVerifiedTestUser } from './helpers/auth';
 
 describe('GET /api/projects/:id/health', () => {
   let app: Express;
@@ -19,24 +20,18 @@ describe('GET /api/projects/:id/health', () => {
     await Project.deleteMany({});
     await Task.deleteMany({});
 
-    const owner = await request(app)
-      .post('/api/auth/register')
-      .send({
-        name: 'Health Owner',
-        email: 'health-owner@example.com',
-        password: 'password123',
-      })
-      .expect(201);
+    const owner = await createVerifiedTestUser({
+      name: 'Health Owner',
+      email: 'health-owner@example.com',
+      password: 'password123',
+    });
     ownerToken = owner.body.data.accessToken;
     ownerId = owner.body.data.user.id || owner.body.data.user._id;
-    const outsider = await request(app)
-      .post('/api/auth/register')
-      .send({
-        name: 'Health Outsider',
-        email: 'health-outsider@example.com',
-        password: 'password123',
-      })
-      .expect(201);
+    const outsider = await createVerifiedTestUser({
+      name: 'Health Outsider',
+      email: 'health-outsider@example.com',
+      password: 'password123',
+    });
     outsiderToken = outsider.body.data.accessToken;
     const project = await Project.create({ name: 'Health Project', ownerId });
     projectId = String(project._id);

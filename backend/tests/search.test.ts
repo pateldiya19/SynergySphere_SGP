@@ -2,6 +2,7 @@ import request from 'supertest';
 import { Express } from 'express';
 import { createApp } from '../src/app';
 import { Project, Task, User } from '../src/app/models';
+import { createVerifiedTestUser } from './helpers/auth';
 
 describe('Global search', () => {
   let app: Express;
@@ -17,9 +18,11 @@ describe('Global search', () => {
     await Project.deleteMany({});
     await Task.deleteMany({});
 
-    const ownerResponse = await request(app)
-      .post('/api/auth/register')
-      .send({ name: 'Search Owner', email: 'search-owner@example.com', password: 'password123' });
+    const ownerResponse = await createVerifiedTestUser({
+      name: 'Search Owner',
+      email: 'search-owner@example.com',
+      password: 'password123',
+    });
     accessToken = ownerResponse.body.data.accessToken;
     ownerId = ownerResponse.body.data.user.id || ownerResponse.body.data.user._id;
   });

@@ -15,6 +15,7 @@ export interface User {
     avatarUrl?: string;
     linkedAt: Date;
   };
+  isEmailVerified: boolean;
   isActive: boolean;
   lastSeen: Date;
   createdAt: Date;

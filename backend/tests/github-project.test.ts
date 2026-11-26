@@ -2,6 +2,7 @@ import request from 'supertest';
 import { Express } from 'express';
 import { createApp } from '../src/app';
 import { Project, User } from '../src/app/models';
+import { createVerifiedTestUser } from './helpers/auth';
 
 describe('GitHub project connection', () => {
   let app: Express;
@@ -15,9 +16,11 @@ describe('GitHub project connection', () => {
   beforeEach(async () => {
     await User.deleteMany({});
     await Project.deleteMany({});
-    const registration = await request(app)
-      .post('/api/auth/register')
-      .send({ name: 'GitHub Owner', email: 'github-owner@example.com', password: 'password123' });
+    const registration = await createVerifiedTestUser({
+      name: 'GitHub Owner',
+      email: 'github-owner@example.com',
+      password: 'password123',
+    });
     accessToken = registration.body.data.accessToken;
   });
 

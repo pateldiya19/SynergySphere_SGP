@@ -5,6 +5,12 @@ import { authenticate, validate } from '@/middleware';
 const router = Router();
 router.use(authenticate);
 router.get('/:id', validate(AutopilotController.projectValidation), AutopilotController.get);
+// The only route that spends AI quota, and only when the user asks for it.
+router.post(
+  '/:id/analyze',
+  validate(AutopilotController.projectValidation),
+  AutopilotController.analyze
+);
 router.post(
   '/:id/assistant',
   validate(AutopilotController.questionValidation),

@@ -5,6 +5,7 @@ import { createApp } from '../src/app';
 import { config } from '../src/config';
 import { Project, Task, User } from '../src/app/models';
 import { parseRepositoryInput } from '../src/core/utils/github';
+import { createVerifiedTestUser } from './helpers/auth';
 
 describe('GitHub repository binding', () => {
   let app: Express;
@@ -22,10 +23,11 @@ describe('GitHub repository binding', () => {
     await Project.deleteMany({});
     await Task.deleteMany({});
 
-    const owner = await request(app)
-      .post('/api/auth/register')
-      .send({ name: 'Repo Owner', email: 'repo-owner@example.com', password: 'password123' })
-      .expect(201);
+    const owner = await createVerifiedTestUser({
+      name: 'Repo Owner',
+      email: 'repo-owner@example.com',
+      password: 'password123',
+    });
     token = owner.body.data.accessToken;
   });
 

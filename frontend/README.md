@@ -60,9 +60,8 @@ npm run dev
 ```
 
 The Vite server listens on `http://localhost:5173` and proxies `/api` to
-`VITE_API_BASE_URL`. Set that value to the actual backend URL (the checked-in
-example uses `http://localhost:8000`; the backend example configuration uses
-port `5000`, so choose one port and keep the values consistent).
+`VITE_API_BASE_URL`. The checked-in frontend and backend examples both use
+`http://localhost:5000`; keep `VITE_WS_URL` aligned with the backend port too.
 
 For a production-like local preview:
 

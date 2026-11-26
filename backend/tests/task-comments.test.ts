@@ -2,6 +2,7 @@ import request from 'supertest';
 import { Express } from 'express';
 import { createApp } from '../src/app';
 import { Notification, Project, Task, TaskComment, User } from '../src/app/models';
+import { createVerifiedTestUser } from './helpers/auth';
 
 describe('Task comments', () => {
   let app: Express;
@@ -25,11 +26,8 @@ describe('Task comments', () => {
     await TaskComment.deleteMany({});
     await Notification.deleteMany({});
 
-    const register = async (name: string, email: string) =>
-      request(app)
-        .post('/api/auth/register')
-        .send({ name, email, password: 'password123' })
-        .expect(201);
+    const register = (name: string, email: string) =>
+      createVerifiedTestUser({ name, email, password: 'password123' });
 
     const owner = await register('Comment Owner', 'comment-owner@example.com');
     const member = await register('Comment Member', 'comment-member@example.com');

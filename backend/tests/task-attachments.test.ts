@@ -3,6 +3,7 @@ import { Express } from 'express';
 import { createApp } from '../src/app';
 import { Project, Task, TaskHistory, User } from '../src/app/models';
 import { TaskAttachmentStorageService } from '../src/app/services/TaskAttachmentStorageService';
+import { createVerifiedTestUser } from './helpers/auth';
 
 describe('Task attachments', () => {
   let app: Express;
@@ -22,14 +23,14 @@ describe('Task attachments', () => {
     await Task.deleteMany({});
     await TaskHistory.deleteMany({});
 
-    const owner = await request(app).post('/api/auth/register').send({
+    const owner = await createVerifiedTestUser({
       name: 'Attachment Owner',
       email: 'attachment-owner@example.com',
       password: 'password123',
     });
     ownerToken = owner.body.data.accessToken;
     ownerId = owner.body.data.user.id || owner.body.data.user._id;
-    const outsider = await request(app).post('/api/auth/register').send({
+    const outsider = await createVerifiedTestUser({
       name: 'Attachment Outsider',
       email: 'attachment-outsider@example.com',
       password: 'password123',

@@ -2,6 +2,7 @@ import request from 'supertest';
 import { Express } from 'express';
 import { Project, Task, TaskHistory, User } from '../src/app/models';
 import { createApp } from '../src/app';
+import { createVerifiedTestUser } from './helpers/auth';
 
 describe('Task dependencies', () => {
   let app: Express;
@@ -25,19 +26,19 @@ describe('Task dependencies', () => {
     await Task.deleteMany({});
     await TaskHistory.deleteMany({});
 
-    const owner = await request(app).post('/api/auth/register').send({
+    const owner = await createVerifiedTestUser({
       name: 'Dependency Owner',
       email: 'dependency-owner@example.com',
       password: 'password123',
     });
     ownerToken = owner.body.data.accessToken;
-    const member = await request(app).post('/api/auth/register').send({
+    const member = await createVerifiedTestUser({
       name: 'Dependency Member',
       email: 'dependency-member@example.com',
       password: 'password123',
     });
     memberToken = member.body.data.accessToken;
-    const outsider = await request(app).post('/api/auth/register').send({
+    const outsider = await createVerifiedTestUser({
       name: 'Dependency Outsider',
       email: 'dependency-outsider@example.com',
       password: 'password123',

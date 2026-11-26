@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, LockKeyhole, Mail, User } from 'lucide-react'
 import { useAuth } from '@/providers/AuthProvider'
 import { useToast } from '@/components/ui/Toast'
@@ -22,6 +22,7 @@ export function RegisterPage() {
 
   const { register } = useAuth()
   const { addToast } = useToast()
+  const navigate = useNavigate()
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -69,16 +70,22 @@ export function RegisterPage() {
     setIsLoading(true)
     try {
       const fullName = `${formData.firstName} ${formData.lastName}`
-      await register(formData.email, formData.password, fullName)
+      const resendAvailableAt = await register(formData.email, formData.password, fullName)
       addToast({
-        title: 'Account created',
-        description: 'Welcome to SynergySphere. You can now start collaborating.',
-        type: 'success',
+        title: 'Check your email',
+        description: 'Enter the verification code we sent to finish creating your account.',
+        type: 'default',
       })
-    } catch {
+      navigate(
+        `/verify-email?email=${encodeURIComponent(
+          formData.email.trim()
+        )}&resendAt=${encodeURIComponent(resendAvailableAt || '')}`
+      )
+    } catch (error) {
       addToast({
         title: 'Registration failed',
-        description: 'Please try again or contact support if the problem persists.',
+        description:
+          error instanceof Error ? error.message : 'Please try again or contact support.',
         type: 'error',
       })
     } finally {

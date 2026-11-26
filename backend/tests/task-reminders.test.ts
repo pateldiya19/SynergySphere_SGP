@@ -3,6 +3,7 @@ import { Express } from 'express';
 import { createApp } from '../src/app';
 import { Notification, Project, Task, User } from '../src/app/models';
 import { TaskReminderService } from '../src/app/services/TaskReminderService';
+import { createVerifiedTestUser } from './helpers/auth';
 
 describe('Due-date and overdue task reminders', () => {
   let app: Express;
@@ -23,11 +24,8 @@ describe('Due-date and overdue task reminders', () => {
     await Task.deleteMany({});
     await Notification.deleteMany({});
 
-    const register = async (name: string, email: string) =>
-      request(app)
-        .post('/api/auth/register')
-        .send({ name, email, password: 'password123' })
-        .expect(201);
+    const register = (name: string, email: string) =>
+      createVerifiedTestUser({ name, email, password: 'password123' });
 
     const owner = await register('Reminder Owner', 'reminder-owner@example.com');
     const assignee = await register('Reminder Assignee', 'reminder-assignee@example.com');

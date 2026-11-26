@@ -5,10 +5,7 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { config } from '@/config';
 import { logger } from '@/utils';
 import { AutopilotContext } from './AutopilotService';
-import {
-  AutopilotAiResult,
-  createAutopilotGraph,
-} from './autopilot/AutopilotGraph';
+import { AutopilotAiResult, createAutopilotGraph } from './autopilot/AutopilotGraph';
 
 export type AutopilotAiStatus = {
   configured: boolean;
@@ -16,12 +13,17 @@ export type AutopilotAiStatus = {
   model: string | null;
 };
 
+function hasProviderKey(value: string): boolean {
+  const key = value.trim().toLowerCase();
+  return Boolean(key) && !['fill_me', 'generate_me'].includes(key) && !key.startsWith('your-');
+}
+
 export class AutopilotAiService {
   static status(): AutopilotAiStatus {
-    if (config.AI_PROVIDER === 'openai' && config.OPENAI_API_KEY) {
+    if (config.AI_PROVIDER === 'openai' && hasProviderKey(config.OPENAI_API_KEY)) {
       return { configured: true, provider: 'openai', model: config.OPENAI_MODEL };
     }
-    if (config.AI_PROVIDER === 'gemini' && config.GEMINI_API_KEY) {
+    if (config.AI_PROVIDER === 'gemini' && hasProviderKey(config.GEMINI_API_KEY)) {
       return { configured: true, provider: 'gemini', model: config.GEMINI_MODEL };
     }
     return { configured: false, provider: null, model: null };
@@ -113,38 +115,43 @@ export class AutopilotAiService {
       };
     }
 
-    const stream = await model.stream([
-      new SystemMessage(
-        'Answer the project manager question using only the supplied SGP project data. ' +
-          'Be concise, cite concrete task or metric facts, and clearly label estimates. ' +
-          'Do not propose executing an action in this answer.'
-      ),
-      new HumanMessage(
-        `Question: ${input.question}\nProject health: ${input.context.health.status}\n` +
-          `Progress: ${input.context.progress}%\nRisks: ${JSON.stringify(input.context.health.risks)}\n` +
-          `Tasks: ${JSON.stringify(
-            input.context.tasks.map(task => ({
-              id: task._id || task.id,
-              key: task.taskKey,
-              title: task.title,
-              status: task.status,
-              priority: task.priority,
-              dueDate: task.dueDate,
-            }))
-          )}\nGitHub: ${JSON.stringify(input.context.github)}`
-      ),
-    ]);
     let answer = '';
-    for await (const chunk of stream) {
-      const token =
-        typeof chunk.content === 'string'
-          ? chunk.content
-          : Array.isArray(chunk.content)
-            ? chunk.content.map(item => (typeof item === 'string' ? item : '')).join('')
-            : '';
-      if (!token) continue;
-      answer += token;
-      input.onToken(token);
+    try {
+      const stream = await model.stream([
+        new SystemMessage(
+          'Answer the project manager question using only the supplied SGP project data. ' +
+            'Be concise, cite concrete task or metric facts, and clearly label estimates. ' +
+            'Do not propose executing an action in this answer.'
+        ),
+        new HumanMessage(
+          `Question: ${input.question}\nProject health: ${input.context.health.status}\n` +
+            `Progress: ${input.context.progress}%\nRisks: ${JSON.stringify(input.context.health.risks)}\n` +
+            `Tasks: ${JSON.stringify(
+              input.context.tasks.map(task => ({
+                id: task._id || task.id,
+                key: task.taskKey,
+                title: task.title,
+                status: task.status,
+                priority: task.priority,
+                dueDate: task.dueDate,
+              }))
+            )}\nGitHub: ${JSON.stringify(input.context.github)}`
+        ),
+      ]);
+      for await (const chunk of stream) {
+        const token =
+          typeof chunk.content === 'string'
+            ? chunk.content
+            : Array.isArray(chunk.content)
+              ? chunk.content.map(item => (typeof item === 'string' ? item : '')).join('')
+              : '';
+        if (!token) continue;
+        answer += token;
+        input.onToken(token);
+      }
+    } catch (error: any) {
+      logger.error(`Autopilot streaming provider failed: ${error.message}`);
+      throw new Error('The configured AI provider could not complete this request.');
     }
     return {
       answer,

@@ -321,7 +321,10 @@ export type ApiAutopilot = {
   recommendations: ApiAutopilotRecord[]
   records: ApiAutopilotRecord[]
   ai: {
+    /** True only when a provider actually produced this analysis. */
     available: boolean
+    /** True when a provider key is present, even if the run then failed. */
+    configured: boolean
     provider: 'openai' | 'gemini' | null
     model: string | null
     summary: string
@@ -332,8 +335,20 @@ export type ApiAutopilot = {
   }
 }
 
+/**
+ * Load the Autopilot board. Deterministic risks and recommendations only --
+ * this call never spends AI quota.
+ */
 export function getAutopilot(projectId: string): Promise<ApiAutopilot> {
   return apiRequest<ApiAutopilot>(`/api/autopilot/${projectId}`)
+}
+
+/**
+ * Run an AI analysis on demand. Rejects when the provider is unconfigured or
+ * fails, so the caller can report that rather than showing an empty result.
+ */
+export function runAutopilotAnalysis(projectId: string): Promise<ApiAutopilot> {
+  return apiRequest<ApiAutopilot>(`/api/autopilot/${projectId}/analyze`, { method: 'POST' })
 }
 
 export function askAutopilot(

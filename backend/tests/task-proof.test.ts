@@ -4,6 +4,7 @@ import { Express } from 'express';
 import { createApp } from '../src/app';
 import { config } from '../src/config';
 import { Notification, Project, Task, TaskHistory, User } from '../src/app/models';
+import { createVerifiedTestUser } from './helpers/auth';
 
 describe('Task proof and review workflow', () => {
   let app: Express;
@@ -111,11 +112,8 @@ describe('Task proof and review workflow', () => {
     await TaskHistory.deleteMany({});
     await Notification.deleteMany({});
 
-    const register = async (name: string, email: string) =>
-      request(app)
-        .post('/api/auth/register')
-        .send({ name, email, password: 'password123' })
-        .expect(201);
+    const register = (name: string, email: string) =>
+      createVerifiedTestUser({ name, email, password: 'password123' });
     const owner = await register('Proof Owner', 'proof-owner@example.com');
     const manager = await register('Proof Manager', 'proof-manager@example.com');
     const member = await register('Proof Member', 'proof-member@example.com');

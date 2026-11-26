@@ -6,13 +6,28 @@ import { disconnectSocket } from '@/lib/socket'
 interface AuthContextType {
   user: User | null
   login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string, name: string) => Promise<void>
+  register: (email: string, password: string, name: string) => Promise<string | undefined>
+  verifyEmail: (email: string, code: string) => Promise<void>
+  resendVerification: (email: string) => Promise<string | undefined>
   logout: () => void
   updateUser: (user: User) => void
   isLoading: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+async function postAuthRequest(path: string, payload: Record<string, string>) {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  const result = await response.json().catch(() => null)
+  if (!response.ok) {
+    throw new Error(result?.error || result?.message || 'Authentication request failed')
+  }
+  return normalizeIds(result?.data ?? result)
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -48,20 +63,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const login = async (email: string, password: string) => {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    })
-
-    if (!response.ok) {
-      throw new Error('Login failed')
-    }
-
-    const result = normalizeIds(await response.json())
-    const user = result.data?.user ?? result.user
-    const token = result.data?.accessToken ?? result.token
-    const refreshToken = result.data?.refreshToken ?? result.refreshToken
+    const result = await postAuthRequest('/api/auth/login', { email, password })
+    const user = result?.user
+    const token = result?.accessToken
+    const refreshToken = result?.refreshToken
+    if (!user || !token || !refreshToken) throw new Error('Login response was incomplete')
 
     localStorage.setItem('auth_token', token)
     localStorage.setItem('refresh_token', refreshToken)
@@ -70,25 +76,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const register = async (email: string, password: string, name: string) => {
-    const response = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, name }),
-    })
+    const result = await postAuthRequest('/api/auth/register', { email, password, name })
+    return result?.resendAvailableAt
+  }
 
-    if (!response.ok) {
-      throw new Error('Registration failed')
-    }
+  const verifyEmail = async (email: string, code: string) => {
+    await postAuthRequest('/api/auth/verify-email', { email, code })
+  }
 
-    const result = normalizeIds(await response.json())
-    const user = result.data?.user ?? result.user
-    const token = result.data?.accessToken ?? result.token
-    const refreshToken = result.data?.refreshToken ?? result.refreshToken
-
-    localStorage.setItem('auth_token', token)
-    localStorage.setItem('refresh_token', refreshToken)
-    localStorage.setItem('user_data', JSON.stringify(user))
-    setUser(user)
+  const resendVerification = async (email: string) => {
+    const result = await postAuthRequest('/api/auth/resend-verification', { email })
+    return result?.resendAvailableAt
   }
 
   const logout = () => {
@@ -113,7 +111,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, updateUser, isLoading }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        register,
+        verifyEmail,
+        resendVerification,
+        logout,
+        updateUser,
+        isLoading,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )
