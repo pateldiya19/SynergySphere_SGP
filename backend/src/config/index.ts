@@ -173,7 +173,10 @@ export const config = {
     `http://localhost:${process.env.PORT || 5000}/api/auth/github/callback`,
   AI_PROVIDER: AI_PROVIDER as '' | 'openai' | 'gemini',
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
-  OPENAI_MODEL: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+  OPENAI_BASE_URL: process.env.OPENAI_BASE_URL || '',
+  OPENAI_MODEL:
+    process.env.OPENAI_MODEL ||
+    (process.env.OPENAI_BASE_URL ? 'openai/gpt-oss-20b' : 'gpt-4o-mini'),
   GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
   GEMINI_MODEL: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
 };

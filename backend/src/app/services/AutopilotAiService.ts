@@ -38,6 +38,7 @@ export class AutopilotAiService {
         model: config.OPENAI_MODEL,
         temperature: 0.1,
         maxRetries: 2,
+        ...(config.OPENAI_BASE_URL ? { configuration: { baseURL: config.OPENAI_BASE_URL } } : {}),
       });
     }
     return new ChatGoogleGenerativeAI({

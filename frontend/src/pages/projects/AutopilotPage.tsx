@@ -193,7 +193,7 @@ export function AutopilotPage() {
         { label: 'Project', to: `/projects/${id}` },
         { label: 'Autopilot' },
       ]}
-      title="SGP Autopilot"
+      title="Autopilot"
       description="An evidence-led project manager that spots delivery risk and prepares the next move."
       actions={
         <Button
