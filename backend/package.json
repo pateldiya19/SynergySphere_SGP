@@ -23,7 +23,9 @@
     "prebuild": "npm run clean && npm run lint && npm run type-check",
     "notify:due": "tsx src/scripts/send-reminders.ts",
     "backfill:task-keys": "tsx src/scripts/backfill-task-keys.ts",
-    "demo:github": "tsx src/scripts/demo-github-flow.ts"
+    "demo:github": "tsx src/scripts/demo-github-flow.ts",
+    "verify:multi-repo": "tsx src/scripts/verify-multi-repo.ts",
+    "verify:email": "tsx src/scripts/verify-email.ts"
   },
   "keywords": [
     "nodejs",

@@ -1,0 +1,33 @@
+# Without this file the whole working tree is sent to the daemon as build
+# context -- including node_modules, which is hundreds of megabytes and made
+# the image build take many minutes before it did any work.
+node_modules
+dist
+dev-dist
+coverage
+.vite
+
+# Never bake local environment values into the image. Vite inlines VITE_*
+# at build time, so a copied .env would hard-code localhost URLs into the
+# bundle and break Socket.io when the container is served from any other host.
+.env
+.env.*
+!.env.example
+
+.git
+.gitignore
+*.log
+*.tsbuildinfo
+vite.config.ts.timestamp-*
+
+# Build inputs only; these never affect the served bundle.
+Dockerfile*
+.dockerignore
+cypress
+**/*.test.ts
+**/*.test.tsx
+
+.vscode
+.idea
+.DS_Store
+Thumbs.db

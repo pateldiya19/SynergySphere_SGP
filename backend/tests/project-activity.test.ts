@@ -2,6 +2,7 @@ import request from 'supertest';
 import { Express } from 'express';
 import { Project, Reply, Task, TaskHistory, Thread, User } from '../src/app/models';
 import { createApp } from '../src/app';
+import { createVerifiedTestUser } from './helpers/auth';
 
 describe('Project activity timeline', () => {
   let app: Express;
@@ -22,7 +23,7 @@ describe('Project activity timeline', () => {
     await Thread.deleteMany({});
     await Reply.deleteMany({});
 
-    const registration = await request(app).post('/api/auth/register').send({
+    const registration = await createVerifiedTestUser({
       name: 'Timeline Owner',
       email: 'timeline-owner@example.com',
       password: 'password123',
@@ -104,7 +105,7 @@ describe('Project activity timeline', () => {
       expect.objectContaining({ page: 1, limit: 2, total: 4, pages: 2 })
     );
 
-    const outsiderRegistration = await request(app).post('/api/auth/register').send({
+    const outsiderRegistration = await createVerifiedTestUser({
       name: 'Timeline Outsider',
       email: 'timeline-outsider@example.com',
       password: 'password123',
@@ -116,7 +117,7 @@ describe('Project activity timeline', () => {
   });
 
   it('records task and member mutations in the project activity feed', async () => {
-    const memberRegistration = await request(app).post('/api/auth/register').send({
+    const memberRegistration = await createVerifiedTestUser({
       name: 'Timeline Member',
       email: 'timeline-member@example.com',
       password: 'password123',
@@ -238,7 +239,7 @@ describe('Project activity timeline', () => {
     expect(response.body.data.completionOverTime).toHaveLength(1);
     expect(response.body.data.memberWorkload[0].assignedTasks).toBe(2);
 
-    const outsider = await request(app).post('/api/auth/register').send({
+    const outsider = await createVerifiedTestUser({
       name: 'Analytics Outsider',
       email: 'analytics-outsider@example.com',
       password: 'password123',

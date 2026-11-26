@@ -2,6 +2,7 @@ import request from 'supertest';
 import { Express } from 'express';
 import { createApp } from '../src/app';
 import { Project, ProjectInvitation, Notification, Task, User } from '../src/app/models';
+import { createVerifiedTestUser } from './helpers/auth';
 
 describe('Project invitation workflow', () => {
   let app: Express;
@@ -22,7 +23,7 @@ describe('Project invitation workflow', () => {
     await Notification.deleteMany({});
     await Task.deleteMany({});
 
-    const owner = await request(app).post('/api/auth/register').send({
+    const owner = await createVerifiedTestUser({
       name: 'Workflow Owner',
       email: 'workflow-owner@example.com',
       password: 'password123',
@@ -30,7 +31,7 @@ describe('Project invitation workflow', () => {
     ownerToken = owner.body.data.accessToken;
     ownerId = owner.body.data.user.id || owner.body.data.user._id;
 
-    const member = await request(app).post('/api/auth/register').send({
+    const member = await createVerifiedTestUser({
       name: 'Workflow Member',
       email: 'workflow-member@example.com',
       password: 'password123',
@@ -122,7 +123,7 @@ describe('Project invitation workflow', () => {
   });
 
   it('enforces project membership for assignment and supports reassignment and unassignment', async () => {
-    const outsider = await request(app).post('/api/auth/register').send({
+    const outsider = await createVerifiedTestUser({
       name: 'Assignment Outsider',
       email: 'assignment-outsider@example.com',
       password: 'password123',

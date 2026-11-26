@@ -4,6 +4,7 @@ import { Express } from 'express';
 import { createApp } from '../src/app';
 import { config } from '../src/config';
 import { Project, Task, User } from '../src/app/models';
+import { createVerifiedTestUser } from './helpers/auth';
 
 describe('GitHub webhook route with GitHub-shaped payloads', () => {
   let app: Express;
@@ -21,14 +22,11 @@ describe('GitHub webhook route with GitHub-shaped payloads', () => {
     await Project.deleteMany({});
     await Task.deleteMany({});
 
-    const owner = await request(app)
-      .post('/api/auth/register')
-      .send({
-        name: 'Webhook Owner',
-        email: 'webhook-owner@example.com',
-        password: 'password123',
-      })
-      .expect(201);
+    const owner = await createVerifiedTestUser({
+      name: 'Webhook Owner',
+      email: 'webhook-owner@example.com',
+      password: 'password123',
+    });
     const project = await request(app)
       .post('/api/projects')
       .set('Authorization', `Bearer ${owner.body.data.accessToken}`)

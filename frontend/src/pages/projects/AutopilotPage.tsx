@@ -27,8 +27,10 @@ import {
   ApiAutopilot,
   ApiAutopilotRecord,
   approveAutopilotAction,
+  askAutopilot,
   getAutopilot,
   rejectAutopilotAction,
+  runAutopilotAnalysis,
   streamAutopilot,
 } from '@/lib/api'
 import { cn, formatDateTime } from '@/lib/utils'
@@ -63,6 +65,11 @@ export function AutopilotPage() {
   } | null>(null)
   const [isAsking, setIsAsking] = useState(false)
   const [workingAction, setWorkingAction] = useState('')
+  // AI runs only when the user presses the button, so its progress and failure
+  // are tracked separately from the deterministic board load.
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [analysisError, setAnalysisError] = useState('')
+  const [analysisRanAt, setAnalysisRanAt] = useState<Date | null>(null)
   const { addToast } = useToast()
 
   const load = async () => {
@@ -81,6 +88,30 @@ export function AutopilotPage() {
     void load()
   }, [id])
 
+  const runAnalysis = async () => {
+    if (!id) return
+    setIsAnalyzing(true)
+    setAnalysisError('')
+    try {
+      const result = await runAutopilotAnalysis(id)
+      setData(result)
+      setAnalysisRanAt(new Date())
+      addToast({
+        title: 'AI analysis complete',
+        description: `Analysed by ${result.ai.provider ?? 'the configured provider'}.`,
+        type: 'success',
+      })
+    } catch (runError: any) {
+      // Never leave a failed run looking like a successful one: keep the
+      // deterministic board as it was and say plainly that the AI step failed.
+      const message = runError?.message || 'The AI provider could not complete this analysis.'
+      setAnalysisError(message)
+      addToast({ title: 'AI analysis failed', description: message, type: 'error' })
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
   const pendingActions = useMemo(
     () =>
       data?.recommendations.filter(
@@ -95,18 +126,32 @@ export function AutopilotPage() {
     setIsAsking(true)
     setAnswer({ answer: '', evidence: [] })
     try {
-      let streamedAnswer = ''
-      const result = await streamAutopilot(id, question.trim(), token => {
-        streamedAnswer += token
-        setAnswer(current => ({
-          answer: streamedAnswer,
-          evidence: current?.evidence || [],
-          ai: current?.ai,
-        }))
-      })
-      setAnswer({ answer: streamedAnswer, evidence: result.evidence, ai: result.ai })
+      if (!data?.ai.configured) {
+        const result = await askAutopilot(id, question.trim())
+        setAnswer({
+          answer: result.answer,
+          evidence: result.evidence,
+          ai: {
+            configured: result.ai.available,
+            provider: result.ai.provider,
+            model: result.ai.model,
+          },
+        })
+      } else {
+        let streamedAnswer = ''
+        const result = await streamAutopilot(id, question.trim(), token => {
+          streamedAnswer += token
+          setAnswer(current => ({
+            answer: streamedAnswer,
+            evidence: current?.evidence || [],
+            ai: current?.ai,
+          }))
+        })
+        setAnswer({ answer: streamedAnswer, evidence: result.evidence, ai: result.ai })
+      }
       setQuestion('')
     } catch (askError: any) {
+      setAnswer(null)
       addToast({ title: 'Assistant unavailable', description: askError.message, type: 'error' })
     } finally {
       setIsAsking(false)
@@ -166,45 +211,14 @@ export function AutopilotPage() {
     />
   )
 
-  if (isLoading)
+  if (isLoading && !data)
     return (
       <div className="space-y-6">
         {header}
         <ProjectTabs projectId={id} active="autopilot" />
-
-        <Card
-          className={
-            data.ai.available
-              ? 'border-primary/25 bg-primary-soft/30'
-              : 'border-warning/25 bg-warning-soft/30'
-          }
-        >
-          <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
-            <div className="flex items-start gap-3">
-              <Bot
-                className={cn(
-                  'mt-0.5 h-4 w-4',
-                  data.ai.available ? 'text-primary' : 'text-warning'
-                )}
-              />
-              <div>
-                <p className="text-sm font-semibold">
-                  {data.ai.available
-                    ? `AI reasoning active · ${data.ai.provider}`
-                    : 'Deterministic mode'}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {data.ai.available
-                    ? data.ai.summary ||
-                      'LangGraph is grounding recommendations in this project context.'
-                    : data.ai.error ||
-                      'Configure a backend LLM provider to enable contextual reasoning.'}
-                </p>
-              </div>
-            </div>
-            <Badge variant={data.ai.available ? 'primary' : 'warning'}>
-              {data.ai.available ? data.ai.model : 'Provider not configured'}
-            </Badge>
+        <Card>
+          <CardContent className="pt-5 text-sm text-muted-foreground">
+            Loading current project data and Autopilot analysis…
           </CardContent>
         </Card>
         <StatsSkeleton count={4} />
@@ -244,6 +258,93 @@ export function AutopilotPage() {
     <div className="space-y-6">
       {header}
       <ProjectTabs projectId={id} active="autopilot" />
+
+      {/*
+        Four honest states: a failed run, a completed run, a configured
+        provider waiting to be asked, and no provider at all. The board below
+        is rule-based and is fully populated in every one of them.
+      */}
+      <Card
+        className={cn(
+          analysisError && 'border-destructive/30 bg-destructive-soft/30',
+          !analysisError && data.ai.available && 'border-primary/25 bg-primary-soft/30',
+          !analysisError && !data.ai.available && 'border-border'
+        )}
+      >
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
+          <div className="flex items-start gap-3">
+            {analysisError ? (
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
+            ) : (
+              <Bot
+                className={cn(
+                  'mt-0.5 h-4 w-4 shrink-0',
+                  data.ai.available ? 'text-primary' : 'text-muted-foreground'
+                )}
+                aria-hidden
+              />
+            )}
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">
+                {analysisError
+                  ? 'AI analysis failed'
+                  : data.ai.available
+                  ? `AI analysis complete · ${data.ai.provider}`
+                  : data.ai.configured
+                  ? 'AI analysis not run yet'
+                  : 'Rule-based analysis'}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {analysisError ||
+                  (data.ai.available
+                    ? data.ai.summary ||
+                      'Recommendations below are grounded in this project context.'
+                    : data.ai.configured
+                    ? 'The risks and recommendations below are rule-based. Run an AI analysis for contextual reasoning — it calls the provider, so it only runs when you ask.'
+                    : 'Risk detection runs without an API key. Configure a backend AI provider to add contextual reasoning.')}
+              </p>
+              {analysisRanAt && !analysisError && (
+                <p className="mt-1 text-2xs text-muted-foreground">
+                  Last run {formatDateTime(analysisRanAt.toISOString())}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <Badge
+              variant={analysisError ? 'destructive' : data.ai.available ? 'primary' : 'secondary'}
+            >
+              {data.ai.available && !analysisError
+                ? data.ai.model
+                : data.ai.configured
+                ? `${data.ai.provider ?? 'Provider'} ready`
+                : 'No provider'}
+            </Badge>
+            <Button
+              size="sm"
+              variant={data.ai.available ? 'outline' : 'default'}
+              onClick={runAnalysis}
+              loading={isAnalyzing}
+              disabled={!data.ai.configured || isAnalyzing}
+              title={
+                data.ai.configured
+                  ? 'Calls the configured AI provider'
+                  : 'No AI provider configured on this server'
+              }
+            >
+              <Sparkles aria-hidden />
+              {isAnalyzing
+                ? 'Analysing…'
+                : analysisError
+                ? 'Retry AI analysis'
+                : data.ai.available
+                ? 'Re-run AI analysis'
+                : 'Run AI analysis'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <section className="rounded-xl border bg-card p-5 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-5">
@@ -463,8 +564,8 @@ export function AutopilotPage() {
                 <Bot className="h-4 w-4 text-primary" />
                 <CardTitle className="text-sm">Ask Autopilot</CardTitle>
               </div>
-              <Badge variant={data.ai.available ? 'primary' : 'secondary'}>
-                {data.ai.available ? 'LangGraph + AI' : 'Live project data'}
+              <Badge variant={data.ai.configured ? 'primary' : 'secondary'}>
+                {data.ai.configured ? 'LangGraph + AI' : 'Rule-based fallback'}
               </Badge>
             </CardHeader>
             <CardContent>

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { apiRequest } from '@/lib/api'
+import { apiRequest, streamAutopilot } from '@/lib/api'
 
 describe('apiRequest', () => {
   beforeEach(() => {
@@ -50,5 +50,38 @@ describe('apiRequest', () => {
     ])
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('delivers Autopilot SSE tokens and evidence from a successful stream', async () => {
+    const stream =
+      'event: token\ndata: {"token":"Project "}\n\n' +
+      'event: token\ndata: {"token":"is on track."}\n\n' +
+      'event: complete\ndata: {"evidence":[{"label":"Health","value":"Healthy"}],"ai":{"configured":true,"provider":"openai","model":"test-model"}}\n\n'
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(stream, { status: 200 })))
+    )
+    const tokens: string[] = []
+
+    await expect(
+      streamAutopilot('project-1', 'Status?', token => tokens.push(token))
+    ).resolves.toEqual({
+      evidence: [{ label: 'Health', value: 'Healthy' }],
+      ai: { configured: true, provider: 'openai', model: 'test-model' },
+    })
+    expect(tokens).toEqual(['Project ', 'is on track.'])
+  })
+
+  it('rejects an Autopilot stream error event instead of reporting completion', async () => {
+    const stream =
+      'event: error\ndata: {"error":"The configured AI provider could not complete this request."}\n\n'
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(stream, { status: 200 })))
+    )
+
+    await expect(streamAutopilot('project-1', 'Status?', vi.fn())).rejects.toThrow(
+      'The configured AI provider could not complete this request.'
+    )
   })
 })

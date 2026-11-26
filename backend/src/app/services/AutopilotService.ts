@@ -188,6 +188,24 @@ export class AutopilotService {
     return candidates;
   }
 
+  private static verifiedAiFacts(context: AutopilotContext, facts: unknown): string[] {
+    const knownFacts = [
+      `${context.health.metrics.completedTasks} of ${context.health.metrics.totalTasks} tasks are complete.`,
+      `${context.health.risks.length} active risk signals are present.`,
+      `${context.github.commits} linked GitHub commits are recorded.`,
+      `Project health is ${context.health.status}.`,
+      `Project progress is ${context.progress}%.`,
+    ];
+    const normalized = (value: string) => value.trim().toLowerCase();
+    return (Array.isArray(facts) ? facts : [])
+      .filter(
+        (fact): fact is string =>
+          typeof fact === 'string' &&
+          knownFacts.some(known => normalized(known) === normalized(fact))
+      )
+      .slice(0, 20);
+  }
+
   private static safeAiRecommendations(
     context: AutopilotContext,
     result: AutopilotAiResult
@@ -196,27 +214,99 @@ export class AutopilotService {
     const memberIds = new Set(
       ((context.project as any).members || []).map((member: any) => idOf(member.userId))
     );
-    return result.recommendations
-      .filter(candidate => candidate && candidate.title && candidate.summary)
+    const knownEvidence = [
+      { label: 'Health', value: context.health.status },
+      { label: 'Progress', value: `${context.progress}% complete` },
+      { label: 'Open risks', value: String(context.health.risks.length) },
+      { label: 'GitHub commits', value: String(context.github.commits) },
+      { label: 'Pull requests', value: String(context.github.pullRequests) },
+      ...context.tasks.flatMap(task => {
+        const key = String(task.taskKey || 'Task');
+        const evidence = [
+          { label: 'Task', value: `${key} · ${task.title}` },
+          { label: 'Task', value: String(task.title) },
+          { label: 'Status', value: String(task.status).replace(/_/g, ' ') },
+          { label: 'Priority', value: String(task.priority) },
+        ];
+        if (task.dueDate && Number.isFinite(new Date(task.dueDate).getTime())) {
+          evidence.push({
+            label: 'Due date',
+            value: new Date(task.dueDate).toISOString(),
+          });
+        }
+        return evidence;
+      }),
+    ];
+    const normalized = (value: string) => value.trim().toLowerCase();
+    const recommendations = Array.isArray(result.recommendations) ? result.recommendations : [];
+
+    return recommendations
+      .filter(
+        candidate =>
+          candidate &&
+          typeof candidate.title === 'string' &&
+          candidate.title.trim() &&
+          typeof candidate.summary === 'string' &&
+          candidate.summary.trim()
+      )
       .map(candidate => {
+        const evidence: Array<{ label: string; value: string }> = [];
+        if (Array.isArray(candidate.evidence)) {
+          for (const item of candidate.evidence) {
+            if (!item || typeof item.label !== 'string' || typeof item.value !== 'string') continue;
+            const verified = knownEvidence.find(
+              known =>
+                normalized(known.label) === normalized(item.label) &&
+                normalized(known.value) === normalized(item.value)
+            );
+            if (
+              verified &&
+              !evidence.some(
+                entry => entry.label === verified.label && entry.value === verified.value
+              )
+            ) {
+              evidence.push(verified);
+            }
+          }
+        }
+        if (evidence.length === 0) return null;
+
         const action = candidate.action;
+        const hasTask = typeof action?.taskId === 'string' && taskIds.has(action.taskId);
         const safeAction =
-          action &&
-          taskIds.has(String(action.taskId)) &&
-          (action.type !== 'assign_task' ||
-            (action.assigneeId && memberIds.has(String(action.assigneeId)))) &&
-          (action.type !== 'reschedule_task' ||
-            (action.dueDate && Number.isFinite(new Date(String(action.dueDate)).getTime()))) &&
-          (action.type !== 'update_priority' ||
-            (action.priority && ['low', 'medium', 'high', 'urgent'].includes(action.priority)))
+          hasTask &&
+          action.type === 'assign_task' &&
+          typeof action.assigneeId === 'string' &&
+          memberIds.has(action.assigneeId)
             ? {
                 type: action.type,
                 taskId: action.taskId,
-                ...(action.assigneeId ? { assigneeId: action.assigneeId } : {}),
-                ...(action.dueDate ? { dueDate: new Date(action.dueDate) } : {}),
-                ...(action.priority ? { priority: action.priority } : {}),
+                assigneeId: action.assigneeId,
               }
-            : undefined;
+            : hasTask &&
+                action.type === 'reschedule_task' &&
+                typeof action.dueDate === 'string' &&
+                Number.isFinite(new Date(action.dueDate).getTime())
+              ? {
+                  type: action.type,
+                  taskId: action.taskId,
+                  dueDate: new Date(action.dueDate),
+                }
+              : hasTask &&
+                  action.type === 'update_priority' &&
+                  typeof action.priority === 'string' &&
+                  ['low', 'medium', 'high', 'urgent'].includes(action.priority)
+                ? {
+                    type: action.type,
+                    taskId: action.taskId,
+                    priority: action.priority,
+                  }
+                : undefined;
+        const estimates = (Array.isArray(result.estimates) ? result.estimates : [])
+          .filter((estimate): estimate is string => typeof estimate === 'string')
+          .map(estimate => estimate.slice(0, 500))
+          .slice(0, 20);
+
         return {
           fingerprint: `ai:${String(candidate.title).toLowerCase()}:${String(
             action?.taskId || ''
@@ -227,20 +317,14 @@ export class AutopilotService {
             ? candidate.severity
             : 'medium',
           reasoning: String(candidate.reasoning || result.reasoning).slice(0, 5000),
-          evidence: Array.isArray(candidate.evidence)
-            ? candidate.evidence
-                .filter((item: any) => item?.label && item?.value)
-                .map((item: any) => ({
-                  label: String(item.label).slice(0, 100),
-                  value: String(item.value).slice(0, 500),
-                }))
-            : [],
+          evidence,
           action: safeAction,
           source: 'ai' as const,
-          verifiedFacts: result.verifiedFacts,
-          estimates: result.estimates,
+          verifiedFacts: this.verifiedAiFacts(context, result.verifiedFacts),
+          estimates,
         };
-      });
+      })
+      .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null);
   }
 
   static async analyzeProject(
@@ -253,6 +337,8 @@ export class AutopilotService {
     newRiskKeys: string[];
     ai: {
       available: boolean;
+      /** Whether a provider key is present, regardless of whether a run succeeded. */
+      configured: boolean;
       provider: 'openai' | 'gemini' | null;
       model: string | null;
       summary: string;
@@ -339,28 +425,30 @@ export class AutopilotService {
         ...aiRun.status,
         summary: aiRun.result.summary,
         reasoning: aiRun.result.reasoning,
-        verifiedFacts: aiRun.result.verifiedFacts,
+        verifiedFacts: this.verifiedAiFacts(context, aiRun.result.verifiedFacts),
         estimates: aiRun.result.estimates,
         ...(aiRun.error ? { error: aiRun.error } : {}),
       };
-      for (const candidate of this.safeAiRecommendations(context, aiRun.result)) {
-        const existing = await AutopilotRecord.findOne({
-          projectId,
-          type: 'recommendation',
-          fingerprint: candidate.fingerprint,
-          status: { $in: ['pending', 'approved', 'executed'] },
-        });
-        if (!existing) {
-          recommendations.push(
-            await AutopilotRecord.create({
-              projectId,
-              type: 'recommendation',
-              status: candidate.action ? 'pending' : 'observed',
-              ...candidate,
-            })
-          );
-        } else if (existing.status === 'pending') {
-          recommendations.push(existing);
+      if (aiRun.available) {
+        for (const candidate of this.safeAiRecommendations(context, aiRun.result)) {
+          const existing = await AutopilotRecord.findOne({
+            projectId,
+            type: 'recommendation',
+            fingerprint: candidate.fingerprint,
+            status: { $in: ['pending', 'approved', 'executed'] },
+          });
+          if (!existing) {
+            recommendations.push(
+              await AutopilotRecord.create({
+                projectId,
+                type: 'recommendation',
+                status: candidate.action ? 'pending' : 'observed',
+                ...candidate,
+              })
+            );
+          } else if (existing.status === 'pending') {
+            recommendations.push(existing);
+          }
         }
       }
     }
@@ -394,6 +482,7 @@ export class AutopilotService {
     );
     if (!task) throw new Error('Recommended task no longer exists');
     const project: any = task.projectId;
+    if (!project) throw new Error('The task project no longer exists');
     if (String(record.projectId) !== String(project._id)) {
       throw new Error('Recommendation project does not match the target task');
     }
@@ -401,6 +490,7 @@ export class AutopilotService {
       throw new Error('Only project owners and managers can approve Autopilot actions');
     }
     const action: any = record.action;
+    if (!action) throw new Error('Recommendation has no executable action');
     const update: any = {};
     if (action.type === 'assign_task') update.assigneeId = action.assigneeId;
     if (action.type === 'reschedule_task') update.dueDate = action.dueDate;
@@ -411,27 +501,66 @@ export class AutopilotService {
     ) {
       throw new Error('Unsupported or incomplete Autopilot action');
     }
-    await Task.findByIdAndUpdate(task._id, update, { runValidators: true });
-    await TaskHistoryService.record({
-      taskId: String(task._id),
-      projectId: String(project._id),
-      actorId,
-      type:
-        action.type === 'assign_task'
-          ? 'TASK_ASSIGNED'
-          : action.type === 'reschedule_task'
-            ? 'DEADLINE_CHANGED'
-            : 'PRIORITY_CHANGED',
-      source: 'system',
-      description: `Autopilot action executed: ${action.type.replace(/_/g, ' ')}`,
-      changes: update,
-    });
-    record.status = 'executed';
-    record.actorId = actorId as any;
-    record.result = `Updated ${task.title}`;
-    await record.save();
+    if (
+      action.type === 'assign_task' &&
+      !(project.members || []).some(
+        (member: any) => idOf(member.userId) === String(action.assigneeId)
+      )
+    ) {
+      throw new Error('The recommended assignee is no longer a project member');
+    }
+
+    const claimedRecord = await AutopilotRecord.findOneAndUpdate(
+      { _id: record._id, type: 'recommendation', status: 'pending' },
+      { $set: { status: 'approved', actorId } },
+      { new: true }
+    );
+    if (!claimedRecord) throw new Error('Recommendation is no longer pending');
+
+    try {
+      const taskUpdate =
+        action.type === 'reschedule_task'
+          ? {
+              $set: update,
+              $unset: { dueReminderSentAt: 1, overdueReminderSentAt: 1 },
+            }
+          : update;
+      const updatedTask = await Task.findByIdAndUpdate(task._id, taskUpdate, {
+        new: true,
+        runValidators: true,
+      });
+      if (!updatedTask) throw new Error('Recommended task no longer exists');
+      await TaskHistoryService.record({
+        taskId: String(task._id),
+        projectId: String(project._id),
+        actorId,
+        type:
+          action.type === 'assign_task'
+            ? 'TASK_ASSIGNED'
+            : action.type === 'reschedule_task'
+              ? 'DEADLINE_CHANGED'
+              : 'PRIORITY_CHANGED',
+        source: 'system',
+        description: `Autopilot action executed: ${action.type.replace(/_/g, ' ')}`,
+        changes: update,
+      });
+      claimedRecord.status = 'executed';
+      claimedRecord.result = `Updated ${updatedTask.title}`;
+      await claimedRecord.save();
+    } catch (error) {
+      await AutopilotRecord.findOneAndUpdate(
+        { _id: claimedRecord._id, status: 'approved' },
+        {
+          $set: {
+            status: 'failed',
+            result: 'Execution failed. Review the task before creating another recommendation.',
+          },
+        }
+      );
+      throw error;
+    }
     emitToProject(String(project._id), 'autopilot:updated', { projectId: String(project._id) });
-    return record;
+    return claimedRecord;
   }
 
   static async answer(
@@ -467,7 +596,7 @@ export class AutopilotService {
         answer: aiRun.result.answer,
         reasoning: aiRun.result.reasoning,
         evidence,
-        verifiedFacts: aiRun.result.verifiedFacts,
+        verifiedFacts: this.verifiedAiFacts(context, aiRun.result.verifiedFacts),
         estimates: aiRun.result.estimates,
         actorId,
       });
@@ -561,6 +690,14 @@ export class AutopilotService {
     return { ...streamed, evidence };
   }
 
+  /**
+   * Background sweep: deterministic risk detection only.
+   *
+   * Deliberately never passes `useAi`. This runs on a timer for every active
+   * project, so calling a provider here would burn quota continuously in the
+   * background with nobody watching the result. AI analysis is user-initiated
+   * through POST /api/autopilot/:id/analyze and nowhere else.
+   */
   static async monitorProjects(): Promise<void> {
     const projects = await Project.find({ isActive: true }).select('_id').lean();
     for (const project of projects) {

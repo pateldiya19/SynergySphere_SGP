@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Eye, EyeOff, LockKeyhole, Mail } from 'lucide-react'
 import { useAuth } from '@/providers/AuthProvider'
 import { useToast } from '@/components/ui/Toast'
@@ -8,11 +8,13 @@ import { Input } from '@/components/ui/Input'
 import { AuthLayout } from '@/components/layout/AuthLayout'
 
 export function LoginPage() {
-  const [email, setEmail] = useState('')
+  const [searchParams] = useSearchParams()
+  const [email, setEmail] = useState(searchParams.get('email') || '')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({})
+  const [verificationRequired, setVerificationRequired] = useState(false)
 
   const { login } = useAuth()
   const { addToast } = useToast()
@@ -47,10 +49,13 @@ export function LoginPage() {
         description: 'You have successfully signed in.',
         type: 'success',
       })
-    } catch {
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Please check your credentials and try again.'
+      setVerificationRequired(message.toLowerCase().includes('verify your email'))
       addToast({
         title: 'Sign in failed',
-        description: 'Please check your credentials and try again.',
+        description: message,
         type: 'error',
       })
     } finally {
@@ -72,6 +77,11 @@ export function LoginPage() {
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        {searchParams.get('verified') === '1' && (
+          <p role="status" className="text-sm text-success">
+            Your email is verified. Sign in to continue.
+          </p>
+        )}
         <Input
           id="email"
           label="Email"
@@ -80,6 +90,7 @@ export function LoginPage() {
           value={email}
           onChange={e => {
             setEmail(e.target.value)
+            setVerificationRequired(false)
             if (errors.email) setErrors(prev => ({ ...prev, email: '' }))
           }}
           placeholder="you@company.com"
@@ -115,6 +126,17 @@ export function LoginPage() {
         <Button type="submit" variant="brand" size="lg" className="w-full" loading={isLoading}>
           Sign in
         </Button>
+        {verificationRequired && (
+          <p className="text-sm text-muted-foreground">
+            Need a verification code?{' '}
+            <Link
+              to={`/verify-email?email=${encodeURIComponent(email.trim())}`}
+              className="font-medium text-brand hover:underline"
+            >
+              Verify your email
+            </Link>
+          </p>
+        )}
       </form>
     </AuthLayout>
   )

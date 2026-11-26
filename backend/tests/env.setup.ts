@@ -11,7 +11,8 @@
  * satisfy the same validation that production secrets must pass -- weakening
  * the check for tests would defeat the point of having it.
  *
- * Real values in `.env` still win, so a developer's own setup is untouched.
+ * Real application values in `.env` still win, so a developer's setup is
+ * untouched. SMTP is explicitly disabled below to keep tests offline.
  */
 const testDefaults: Record<string, string> = {
   NODE_ENV: 'test',
@@ -28,3 +29,9 @@ for (const [name, value] of Object.entries(testDefaults)) {
     process.env[name] = value;
   }
 }
+
+// Never let an npm test run use a developer's real SMTP credentials. Tests
+// that cover verification mail mock EmailService directly.
+process.env.SMTP_HOST = '';
+process.env.SMTP_EMAIL = '';
+process.env.SMTP_PASSWORD = '';

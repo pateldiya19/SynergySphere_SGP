@@ -79,6 +79,10 @@ const userSchema = new Schema<UserDocument>(
       type: Boolean,
       default: true,
     },
+    isEmailVerified: {
+      type: Boolean,
+      default: true,
+    },
     lastSeen: {
       type: Date,
       default: Date.now,

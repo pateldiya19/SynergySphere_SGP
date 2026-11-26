@@ -3,6 +3,7 @@ import { Express } from 'express';
 import { createApp } from '../src/app';
 import { config } from '../src/config';
 import { GitHubOAuthState, User } from '../src/app/models';
+import { createVerifiedTestUser } from './helpers/auth';
 
 /**
  * Covers the GitHub identity link, whose whole purpose is that a user cannot
@@ -68,14 +69,16 @@ describe('GitHub verified identity linking', () => {
     await User.deleteMany({});
     await GitHubOAuthState.deleteMany({});
 
-    const register = async (name: string, email: string) =>
-      request(app)
-        .post('/api/auth/register')
-        .send({ name, email, password: 'password123' })
-        .expect(201);
-
-    const alice = await register('Alice Dev', 'alice@example.com');
-    const bob = await register('Bob Dev', 'bob@example.com');
+    const alice = await createVerifiedTestUser({
+      name: 'Alice Dev',
+      email: 'alice@example.com',
+      password: 'password123',
+    });
+    const bob = await createVerifiedTestUser({
+      name: 'Bob Dev',
+      email: 'bob@example.com',
+      password: 'password123',
+    });
     aliceToken = alice.body.data.accessToken;
     aliceId = String(alice.body.data.user.id || alice.body.data.user._id);
     bobToken = bob.body.data.accessToken;
